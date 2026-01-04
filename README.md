@@ -14,4 +14,5 @@ Terraform 을 이용해서 기본적인 인프라 세팅을 진행합니다.
 기본적으로 홈 서버는 Proxmox 를 이용하여 구성되며, Terraform - proxmox - ansible로 연동 설정이 되어있습니다. 
 
 
+terraform-provider 는 telmate/proxmox 를 사용합니다.
 
