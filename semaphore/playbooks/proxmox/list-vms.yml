@@ -8,17 +8,12 @@
     semaphore_repository_path: "/tmp/semaphore/project_1/repository_2_template_2"
 
   tasks:
-    - name: Show variables
-      debug:
-        var: proxmox_api_host
-        var: proxmox_api_user
-        var: proxmox_api_token_id
-
     - name: Fetch VM list from Proxmox
       community.proxmox.proxmox_vm_info:
         api_host: "{{ proxmox_api_host }}"
         api_user: "{{ proxmox_api_user }}"
         api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
         validate_certs: false
       register: vm_info
       environment:
