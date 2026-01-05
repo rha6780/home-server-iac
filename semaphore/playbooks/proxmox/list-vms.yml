@@ -4,6 +4,13 @@
   gather_facts: false
 
   tasks:
+    - name: Install required collections
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection install -r collections/requirements.yml -p collections --force
+      connection: local
+      args:
+        chdir: "{{ semaphore_repository_path }}/semaphore"
+
     - name: Fetch VM list from Proxmox
       community.proxmox.proxmox_vm_info:
         api_host: "{{ proxmox_api_host }}"
