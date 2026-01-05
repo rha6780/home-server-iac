@@ -1,4 +1,6 @@
 - name: Install required collections
   ansible.builtin.command:
-    cmd: ansible-galaxy collection install -r /tmp/semaphore/repositories/home-server-iac/requirements.yml -p ./collections --force
+    cmd: ansible-galaxy collection install -r collections/requirements.yml -p collections --force
   connection: local
+  args:
+    chdir: "{{ playbook_dir }}"
