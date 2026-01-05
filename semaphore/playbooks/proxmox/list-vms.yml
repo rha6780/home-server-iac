@@ -11,6 +11,8 @@
     - name: Show variables
       debug:
         var: proxmox_api_host
+        var: proxmox_api_user
+        var: proxmox_api_token_id
 
     - name: Fetch VM list from Proxmox
       community.proxmox.proxmox_vm_info:
