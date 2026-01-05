@@ -1,7 +1,7 @@
 resource "proxmox_vm_qemu" "vm-iac-01" {
-  name                   = "vm-iac-01"
-  target_nodes              = [
-          "pve-main",
+  name = "vm-iac-01"
+  target_nodes = [
+    "pve-main",
   ]
   agent                  = 1
   args                   = null
@@ -21,9 +21,9 @@ resource "proxmox_vm_qemu" "vm-iac-01" {
   qemu_os                = "l26"
   scsihw                 = "virtio-scsi-single"
   tablet                 = true
-  tags                   = null
+  tags                   = ""
   vmid                   = 203
-  start_at_node_boot        = true
+  start_at_node_boot     = true
   description            = <<-EOT
           ## vm-temp-01
 
@@ -31,7 +31,7 @@ resource "proxmox_vm_qemu" "vm-iac-01" {
           - mem : 2GB
           - disk : 20GB
 
-          
+
           - docker installed
           - KST
           - rha6780.pem 으로 접근가능
@@ -50,48 +50,48 @@ resource "proxmox_vm_qemu" "vm-iac-01" {
   }
 
   disks {
-        ide {
-            ide2 {
-                # ignore = false
-                cdrom {
-                    iso         = "local:iso/ubuntu-24.04.3-live-server-amd64.iso"
-                }
-            }
+    ide {
+      ide2 {
+        # ignore = false
+        cdrom {
+          iso = "local:iso/ubuntu-24.04.3-live-server-amd64.iso"
         }
-        scsi {
-            scsi0 {
-                # ignore = false
-
-                disk {
-                    asyncio              = null
-                    backup               = true
-                    cache                = null
-                    discard              = false
-                    emulatessd           = false
-                    format               = "raw"
-                    # id                   = 0
-                    iops_r_burst         = 0
-                    iops_r_burst_length  = 0
-                    iops_r_concurrent    = 0
-                    iops_wr_burst        = 0
-                    iops_wr_burst_length = 0
-                    iops_wr_concurrent   = 0
-                    iothread             = true
-                    # linked_disk_id       = -1
-                    mbps_r_burst         = 0
-                    mbps_r_concurrent    = 0
-                    mbps_wr_burst        = 0
-                    mbps_wr_concurrent   = 0
-                    readonly             = false
-                    replicate            = true
-                    serial               = null
-                    size                 = "20G"
-                    storage              = "local-lvm"
-                    wwn                  = null
-                }
-            }
-        }
+      }
     }
+    scsi {
+      scsi0 {
+        # ignore = false
+
+        disk {
+          asyncio    = null
+          backup     = true
+          cache      = null
+          discard    = false
+          emulatessd = false
+          format     = "raw"
+          # id                   = 0
+          iops_r_burst         = 0
+          iops_r_burst_length  = 0
+          iops_r_concurrent    = 0
+          iops_wr_burst        = 0
+          iops_wr_burst_length = 0
+          iops_wr_concurrent   = 0
+          iothread             = true
+          # linked_disk_id       = -1
+          mbps_r_burst       = 0
+          mbps_r_concurrent  = 0
+          mbps_wr_burst      = 0
+          mbps_wr_concurrent = 0
+          readonly           = false
+          replicate          = true
+          serial             = null
+          size               = "20G"
+          storage            = "local-lvm"
+          wwn                = null
+        }
+      }
+    }
+  }
   network {
     id        = 0
     bridge    = "vmbr0"
