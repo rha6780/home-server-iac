@@ -1,16 +1,19 @@
+---
 - name: Get Proxmox VM list
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    semaphore_repository_path: "/tmp/semaphore/project_1/repository_2_template_2"
+
   tasks:
     - name: Install required collections
       ansible.builtin.command:
         cmd: ansible-galaxy collection install -r requirements.yml -p "{{ semaphore_repository_path }}/semaphore/collections" --force
-      connection: local
       args:
-        chdir: "{{ semaphore_repository_path }}/semaphore/collections"  # 여기가 requirements.yml 위치
-
+        chdir: "{{ semaphore_repository_path }}/semaphore/collections"
+      connection: local
 
     - name: Fetch VM list from Proxmox
       community.proxmox.proxmox_vm_info:
@@ -19,6 +22,8 @@
         api_token_id: "{{ proxmox_api_token_id }}"
         validate_certs: false
       register: vm_info
+      environment:
+        ANSIBLE_COLLECTIONS_PATHS: "{{ semaphore_repository_path }}/semaphore/collections"
 
     - name: Show VM list
       debug:
