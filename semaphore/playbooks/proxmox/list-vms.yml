@@ -8,6 +8,10 @@
     semaphore_repository_path: "/tmp/semaphore/project_1/repository_2_template_2"
 
   tasks:
+    - name: Show variables
+      debug:
+        var: proxmox_api_host
+
     - name: Fetch VM list from Proxmox
       community.proxmox.proxmox_vm_info:
         api_host: "{{ proxmox_api_host }}"
