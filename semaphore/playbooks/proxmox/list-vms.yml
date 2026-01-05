@@ -5,7 +5,7 @@
   gather_facts: false
 
   vars:
-    semaphore_repository_path: "/tmp/semaphore/project_1/repository_2_template_2"
+    ansible_python_interpreter: /usr/bin/python3
 
   tasks:
     - name: Fetch VM list from Proxmox
@@ -16,8 +16,6 @@
         api_token_secret: "{{ proxmox_api_token_secret }}"
         validate_certs: false
       register: vm_info
-      environment:
-        ANSIBLE_COLLECTIONS_PATHS: "{{ semaphore_repository_path }}/semaphore/collections"
 
     - name: Show VM list
       debug:
