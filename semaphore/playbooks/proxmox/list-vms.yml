@@ -2,6 +2,7 @@
 - name: Get Proxmox VM list
   hosts: localhost
   connection: local
+  delegate_to: localhost
   gather_facts: false
 
   vars:
