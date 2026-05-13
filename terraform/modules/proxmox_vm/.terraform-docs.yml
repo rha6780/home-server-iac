@@ -1,0 +1,15 @@
+formatter: "markdown table"
+
+settings:
+  indent: 2
+  default: true
+  required: true
+
+output:
+  file: README.md
+  mode: replace
+
+sections:
+  show:
+    - inputs
+    - outputs
