@@ -1,3 +1,13 @@
+module "vm-vault-docs-01" {
+  source = "./modules/proxmox_vm"
+
+  name        = "vm-vault-docs-01"
+  vmid        = 207
+  target_node = local.default_node
+  storage     = local.default_storage
+  clone       = "vm-temp-01"
+}
+
 module "vm-iac-01" {
   source = "./modules/proxmox_vm"
 

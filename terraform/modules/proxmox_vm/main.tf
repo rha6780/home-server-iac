@@ -3,12 +3,13 @@ resource "proxmox_vm_qemu" "vm" {
   vmid        = var.vmid
   target_nodes = [var.target_node]
 
+  clone                  = var.clone
+  full_clone             = var.clone != null ? true : false
   agent                  = 1
   bios                   = "seabios"
   boot                   = "order=scsi0;ide2;net0"
   define_connection_info = false
   force_create           = false
-  full_clone             = false
   hotplug                = "network,disk,usb"
   kvm                    = true
   memory                 = var.memory

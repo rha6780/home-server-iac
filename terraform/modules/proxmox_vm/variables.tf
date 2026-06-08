@@ -79,3 +79,9 @@ variable "start_at_node_boot" {
   description = "노드 부팅 시 자동 시작"
   default     = true
 }
+
+variable "clone" {
+  type        = string
+  description = "클론할 VM 또는 템플릿 이름 (null이면 빈 VM 생성)"
+  default     = null
+}
