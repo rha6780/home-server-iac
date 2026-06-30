@@ -77,9 +77,26 @@ terraform destroy
 
 ### 현재 관리 중인 VM
 
-| VM 이름 | VMID | CPU | RAM | Disk | OS | Node |
+| VM 이름 | VMID | CPU | RAM | Disk | 용도 | 부팅 |
 |---|---|---|---|---|---|---|
-| vm-iac-01 | 203 | 2 core | 2 GB | 20 GB | Ubuntu 24.04 | pve-main |
+| vm-npm-01 | 200 | 2 core | 2 GB | 20 GB | Nginx Proxy Manager (리버스 프록시) | 자동 |
+| vm-database-01 | 201 | 4 core | 4 GB | 40 GB | 데이터베이스 서버 | 자동 |
+| vm-hoppscotch-01 | 202 | 2 core | 2 GB | 20 GB | Hoppscotch (API 테스트 도구) | 자동 |
+| vm-iac-01 | 203 | 2 core | 2 GB | 20 GB | IaC 관리 (Semaphore 등) | 자동 |
+| vm-docker-registry-01 | 204 | 2 core | 2 GB | 20 GB | Docker 프라이빗 레지스트리 | 자동 |
+| vm-vpn-01 | 205 | 2 core | 2 GB | 20 GB | VPN 서버 | 자동 |
+| vm-jenkins-01 | 206 | 2 core | 2 GB | 20 GB | Jenkins CI/CD | 자동 |
+| vm-vault-docs-01 | 207 | 2 core | 2 GB | 20 GB | 문서/Vault 서버 | 자동 |
+| vm-ourjournal-01 | 301 | 2 core | 2 GB | 20 GB | 개인 저널 서비스 | 자동 |
+| vm-file-share-01 | 504 | 2 core | 2 GB | 32 GB | 파일 공유 서버 | 자동 |
+| vm-mine-lfin-01 | 505 | 4 core | 32 GB | 20 GB | 마인크래프트 Lifin 서버 | 자동 |
+| vm-mine-base-01 | 500 | 2 core | 8 GB | 32 GB | 마인크래프트 베이스 서버 | 수동 |
+| vm-mine-build-01 | 501 | 2 core | 8 GB | 32 GB | 마인크래프트 빌드 서버 | 수동 |
+| vm-mine-wild-01 | 502 | 2 core | 8 GB | 32 GB | 마인크래프트 야생 서버 | 수동 |
+| vm-mine-db-01 | 503 | 2 core | 2 GB | 32 GB | 마인크래프트 DB 서버 | 수동 |
+
+> - 기본값: CPU 2 core, RAM 2 GB, Disk 20 GB (모듈 `proxmox_vm` 기준)
+> - 부팅: 노드 시작 시 자동 부팅 여부 (`start_at_node_boot`)
 
 ---
 
