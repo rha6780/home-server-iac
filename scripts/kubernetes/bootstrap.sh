@@ -127,17 +127,18 @@ generate_env() {
   local hint
   hint=$(terraform -chdir="${TF_DIR}" output -json k8s_shell_env_hint)
 
-  local haproxy_ip cp_01_ip cp_02_ip cp_03_ip
+  local haproxy_ip cp_01_ip
   haproxy_ip=$(echo "${hint}" | jq -r '.haproxy_ip')
   cp_01_ip=$(echo "${hint}"   | jq -r '.cp_01_ip')
-  cp_02_ip=$(echo "${hint}"   | jq -r '.cp_join_ips[0]')
-  cp_03_ip=$(echo "${hint}"   | jq -r '.cp_join_ips[1]')
 
-  # worker IPs (배열 크기 동적 처리)
+  # CP join IPs (가변 배열)
+  local cp_join_ips_arr
+  mapfile -t cp_join_ips_arr < <(echo "${hint}" | jq -r '.cp_join_ips[] | select(. != "null")')
+
+  # Worker IPs (가변 배열)
   local worker_ips_arr
   mapfile -t worker_ips_arr < <(echo "${hint}" | jq -r '.worker_ips[]')
 
-  # .env.example 을 베이스로 IP만 덮어쓰기
   if [[ ! -f "${SCRIPT_DIR}/.env.example" ]]; then
     log_error ".env.example 이 없습니다: ${SCRIPT_DIR}/.env.example"
     exit 1
@@ -145,32 +146,53 @@ generate_env() {
 
   cp "${SCRIPT_DIR}/.env.example" "${ENV_FILE}"
 
-  _sed_i "s|^HAPROXY_IP=.*|HAPROXY_IP=\"${haproxy_ip}\"|" "${ENV_FILE}"
-  _sed_i "s|^CP_01_IP=.*|CP_01_IP=\"${cp_01_ip}\"|"       "${ENV_FILE}"
-  _sed_i "s|^CP_02_IP=.*|CP_02_IP=\"${cp_02_ip}\"|"       "${ENV_FILE}"
-  _sed_i "s|^CP_03_IP=.*|CP_03_IP=\"${cp_03_ip}\"|"       "${ENV_FILE}"
+  # CP join IPs 블록 동적 생성 (CP_02_IP, CP_03_IP... + CP_JOIN_IPS 배열)
+  local cp_vars_block="CP_01_IP=\"${cp_01_ip}\""
+  local cp_join_refs=""
+  for i in "${!cp_join_ips_arr[@]}"; do
+    local n=$(( i + 2 ))
+    cp_vars_block+=$'\n'"CP_0${n}_IP=\"${cp_join_ips_arr[$i]}\""
+    cp_join_refs+=$'\n'"  \"\${CP_0${n}_IP}\""
+  done
+  cp_vars_block+=$'\n'"CP_JOIN_IPS=("
+  cp_vars_block+="${cp_join_refs}"
+  cp_vars_block+=$'\n'")"
 
-  # WORKER_IPS 배열 재작성
+  # Worker IPs 블록 동적 생성
   local worker_block="WORKER_IPS=("
   for ip in "${worker_ips_arr[@]}"; do
     worker_block+=$'\n'"  \"${ip}\""
   done
   worker_block+=$'\n'")"
 
-  # .env 에서 기존 WORKER_IPS 블록 교체 (멀티라인 sed 대신 Python 사용)
-  python3 - "${ENV_FILE}" "${worker_block}" <<'PYEOF'
+  # Python으로 CP / WORKER 블록 일괄 치환
+  python3 - "${ENV_FILE}" "${haproxy_ip}" "${cp_vars_block}" "${worker_block}" <<'PYEOF'
 import sys, re
 
-env_path = sys.argv[1]
-new_block = sys.argv[2]
+env_path    = sys.argv[1]
+haproxy_ip  = sys.argv[2]
+cp_block    = sys.argv[3]
+worker_block = sys.argv[4]
 
 with open(env_path) as f:
     content = f.read()
 
-# WORKER_IPS=(\n...\n) 블록 치환
+# HAPROXY_IP
+content = re.sub(r'^HAPROXY_IP=.*', f'HAPROXY_IP="{haproxy_ip}"', content, flags=re.MULTILINE)
+
+# CP_01_IP ~ CP_JOIN_IPS 블록 전체 치환
+# 패턴: CP_01_IP=... 부터 CP_JOIN_IPS=(...) 까지
+content = re.sub(
+    r'CP_01_IP=.*?CP_JOIN_IPS=\(.*?\)',
+    cp_block,
+    content,
+    flags=re.DOTALL
+)
+
+# WORKER_IPS 블록 치환
 content = re.sub(
     r'WORKER_IPS=\(.*?\)',
-    new_block,
+    worker_block,
     content,
     flags=re.DOTALL
 )
@@ -182,7 +204,7 @@ PYEOF
   log_success "Step B 완료 — .env 생성: ${ENV_FILE}"
   log_info "  HAProxy    : ${haproxy_ip}"
   log_info "  CP Primary : ${cp_01_ip}"
-  log_info "  CP Join    : ${cp_02_ip}, ${cp_03_ip}"
+  log_info "  CP Join    : ${cp_join_ips_arr[*]:-없음}"
   log_info "  Workers    : ${worker_ips_arr[*]}"
 }
 

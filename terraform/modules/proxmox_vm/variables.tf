@@ -65,7 +65,7 @@ variable "bridge" {
 variable "tags" {
   type        = string
   description = "VM 태그"
-  default     = ""
+  default     = null
 }
 
 variable "notes" {
