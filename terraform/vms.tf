@@ -18,7 +18,7 @@ module "vm-iac-01" {
   cores       = 2
   disk_size   = "20G"
   storage     = local.default_storage
-  macaddr = "bc:24:11:36:e2:1f"
+  macaddr     = "bc:24:11:36:e2:1f"
 }
 
 module "vm-npm-01" {
@@ -37,9 +37,9 @@ module "vm-database-01" {
   vmid        = 201
   target_node = local.default_node
   storage     = local.default_storage
-  cores = 4
-  memory = 4096
-  disk_size = "40G"
+  cores       = 4
+  memory      = 4096
+  disk_size   = "40G"
 }
 
 module "vm-hoppscotch-01" {
@@ -90,13 +90,13 @@ module "vm-ourjournal-01" {
 module "vm-mine-base-01" {
   source = "./modules/proxmox_vm"
 
-  name        = "vm-mine-base-01"
-  vmid        = 500
-  target_node = local.default_node
-  storage     = local.default_storage
-  memory      = 8196
-  cores       = 2
-  disk_size   = "32G"
+  name               = "vm-mine-base-01"
+  vmid               = 500
+  target_node        = local.default_node
+  storage            = local.default_storage
+  memory             = 8196
+  cores              = 2
+  disk_size          = "32G"
   start_at_node_boot = false
 
 }
@@ -104,36 +104,36 @@ module "vm-mine-base-01" {
 module "vm-mine-build-01" {
   source = "./modules/proxmox_vm"
 
-  name        = "vm-mine-build-01"
-  vmid        = 501
-  target_node = local.default_node
-  storage     = local.default_storage
-  memory      = 8196
-  cores       = 2
-  disk_size   = "32G"
+  name               = "vm-mine-build-01"
+  vmid               = 501
+  target_node        = local.default_node
+  storage            = local.default_storage
+  memory             = 8196
+  cores              = 2
+  disk_size          = "32G"
   start_at_node_boot = false
 }
 
 module "vm-mine-wild-01" {
   source = "./modules/proxmox_vm"
 
-  name        = "vm-mine-wild-01"
-  vmid        = 502
-  target_node = local.default_node
-  storage     = local.default_storage
-  memory      = 8196
-  disk_size   = "32G"
+  name               = "vm-mine-wild-01"
+  vmid               = 502
+  target_node        = local.default_node
+  storage            = local.default_storage
+  memory             = 8196
+  disk_size          = "32G"
   start_at_node_boot = false
 }
 
 module "vm-mine-db-01" {
   source = "./modules/proxmox_vm"
 
-  name        = "vm-mine-db-01"
-  vmid        = 503
-  target_node = local.default_node
-  storage     = local.default_storage
-  disk_size   = "32G"
+  name               = "vm-mine-db-01"
+  vmid               = 503
+  target_node        = local.default_node
+  storage            = local.default_storage
+  disk_size          = "32G"
   start_at_node_boot = false
 }
 
@@ -144,7 +144,7 @@ module "vm-file-share-01" {
   vmid        = 504
   target_node = local.default_node
   storage     = local.default_storage
-  disk_size = "32G"
+  disk_size   = "32G"
 }
 
 module "vm-mine-lfin-01" {

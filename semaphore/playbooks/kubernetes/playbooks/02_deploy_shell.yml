@@ -1,0 +1,11 @@
+---
+- name: Run Kubernetes shell deploy from Ansible
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Run selected Kubernetes deploy steps
+      ansible.builtin.command:
+        cmd: "{{ k8s_deploy_command }}"
+      changed_when: true

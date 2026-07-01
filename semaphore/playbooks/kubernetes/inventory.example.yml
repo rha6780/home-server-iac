@@ -1,0 +1,29 @@
+---
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/your-key.pem
+    ansible_ssh_common_args: -o StrictHostKeyChecking=no -o ConnectTimeout=10
+  children:
+    k8s_haproxy:
+      hosts:
+        vm-dev-haproxy-01:
+          ansible_host: 192.168.219.29
+    k8s_cp_primary:
+      hosts:
+        vm-dev-k8s-cp-01:
+          ansible_host: 192.168.219.30
+    k8s_cp_join:
+      hosts:
+        vm-dev-k8s-cp-02:
+          ansible_host: 192.168.219.31
+        vm-dev-k8s-cp-03:
+          ansible_host: 192.168.219.32
+    k8s_worker:
+      hosts:
+        vm-dev-k8s-wk-01:
+          ansible_host: 192.168.219.41
+        vm-dev-k8s-wk-02:
+          ansible_host: 192.168.219.42
+        vm-dev-k8s-wk-03:
+          ansible_host: 192.168.219.43

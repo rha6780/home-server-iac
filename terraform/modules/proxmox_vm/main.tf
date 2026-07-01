@@ -1,6 +1,6 @@
 resource "proxmox_vm_qemu" "vm" {
-  name        = var.name
-  vmid        = var.vmid
+  name         = var.name
+  vmid         = var.vmid
   target_nodes = [var.target_node]
 
   clone                  = var.clone
@@ -54,15 +54,15 @@ resource "proxmox_vm_qemu" "vm" {
     scsi {
       scsi0 {
         disk {
-          size               = var.disk_size
-          storage            = var.storage
-          format             = "raw"
-          iothread           = true
-          backup             = true
-          replicate          = true
-          discard            = false
-          emulatessd         = false
-          readonly           = false
+          size                 = var.disk_size
+          storage              = var.storage
+          format               = "raw"
+          iothread             = true
+          backup               = true
+          replicate            = true
+          discard              = false
+          emulatessd           = false
+          readonly             = false
           iops_r_burst         = 0
           iops_r_burst_length  = 0
           iops_r_concurrent    = 0

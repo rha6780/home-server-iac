@@ -103,3 +103,16 @@ import {
   id = "pve-main/qemu/999"
 }
 ```
+
+## Kubernetes HA VM 세트
+
+Kubernetes 설치용 VM은 `k8s_vms.tf`에 별도 선언되어 있으며 기본값은 비활성화되어 있습니다.
+
+```bash
+cp k8s.auto.tfvars.example k8s.auto.tfvars
+terraform plan
+terraform apply
+terraform output k8s_shell_env_hint
+```
+
+`k8s_vms`의 IP는 VM 내부 네트워크 설정을 직접 바꾸지는 않습니다. Terraform VM 생성값과 `scripts/kubernetes/.env`, Ansible inventory를 같은 기준으로 맞추기 위한 설치 입력값입니다.

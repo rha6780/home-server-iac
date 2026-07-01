@@ -1,0 +1,23 @@
+# ============================================================
+# MetalLB - IP 풀 및 L2 광고 설정
+# helm install 후 kubectl apply -f ip-address-pool.yaml
+# [수정 필요] addresses 범위를 환경에 맞게 변경
+# ============================================================
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.219.34-192.168.219.39   # 환경에 맞게 수정하세요
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2-adv
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - default-pool

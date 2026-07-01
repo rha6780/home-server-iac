@@ -1,0 +1,9 @@
+---
+k8s_shell_dir: "{{ inventory_dir }}/../../../scripts/kubernetes"
+k8s_env_file: "{{ k8s_shell_dir }}/.env"
+
+# deploy.sh --step 값입니다. 전체 설치는 1,2,3,4,5 순서로 실행합니다.
+k8s_deploy_steps: "1,2,3,4,5"
+
+# Semaphore에서 실행할 때 필요하면 extra vars로 덮어쓰세요.
+k8s_deploy_command: "bash {{ k8s_shell_dir }}/deploy.sh --step {{ k8s_deploy_steps }}"

@@ -1,0 +1,14 @@
+# ============================================================
+# Calico CNI - tigera-operator Helm values
+# chart: projectcalico/tigera-operator
+# ============================================================
+
+installation:
+  cni:
+    type: Calico
+  calicoNetwork:
+    ipPools:
+      - cidr: 10.219.0.0/16          # cluster-config.yaml podSubnet 과 일치
+        encapsulation: VXLANCrossSubnet
+        natOutgoing: Enabled
+        nodeSelector: all()

@@ -28,11 +28,17 @@ home-server-iac/
 │   ├── terraform.tfvars        # 변수 실제값 (git 제외 권장)
 │   └── main.tf                 # VM 리소스 정의
 │
-└── semaphore/                  # Semaphore + Ansible 자동화
-    └── playbooks/
-        └── proxmox/
-            ├── list-vms.yml    # Proxmox VM 목록 조회 플레이북
-            └── requirements.yml # Ansible 컬렉션 의존성
+├── semaphore/                  # Semaphore + Ansible 자동화
+│   └── playbooks/
+│       ├── proxmox/
+│       │   ├── list-vms.yml    # Proxmox VM 목록 조회 플레이북
+│       │   └── requirements.yml # Ansible 컬렉션 의존성
+│       └── kubernetes/
+│           ├── site.yml        # Kubernetes 설치 Ansible 진입점
+│           └── inventory.example.yml
+│
+└── scripts/
+    └── kubernetes/             # Kubernetes shell-only 설치 스크립트
 ```
 
 ---
@@ -117,6 +123,7 @@ ansible-galaxy collection install -r semaphore/playbooks/proxmox/requirements.ym
 | 플레이북 | 설명 |
 |---|---|
 | `proxmox/list-vms.yml` | Proxmox API를 통해 VM 목록 조회 |
+| `kubernetes/site.yml` | shell 설치 스크립트를 Ansible/Semaphore에서 실행 |
 
 ### Proxmox 연동 변수 (Semaphore에서 설정)
 
@@ -137,6 +144,34 @@ ansible-galaxy collection install -r semaphore/playbooks/proxmox/requirements.ym
 
 2. VM 구성 자동화
    Semaphore UI → Ansible 플레이북 실행 → Proxmox API / SSH → VM 설정
+```
+
+## Kubernetes 설치
+
+Terraform으로 Kubernetes HA 클러스터용 VM을 만들고, 설치는 두 경로 중 하나로 실행합니다.
+
+### 1. Shell-only
+
+```bash
+cd terraform
+cp k8s.auto.tfvars.example k8s.auto.tfvars
+terraform apply
+
+cd ../scripts/kubernetes
+cp .env.example .env
+vi .env
+bash deploy.sh --all
+```
+
+### 2. Ansible/Semaphore
+
+```bash
+cp scripts/kubernetes/.env.example scripts/kubernetes/.env
+vi scripts/kubernetes/.env
+
+ansible-playbook \
+  -i semaphore/playbooks/kubernetes/inventory.example.yml \
+  semaphore/playbooks/kubernetes/site.yml
 ```
 
 ---

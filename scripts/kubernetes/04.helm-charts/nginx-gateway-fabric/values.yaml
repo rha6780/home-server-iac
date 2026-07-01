@@ -1,0 +1,18 @@
+# ============================================================
+# NGINX Gateway Fabric Helm values
+# chart: oci://ghcr.io/nginxinc/charts/nginx-gateway-fabric
+# Kubernetes Gateway API 구현체
+# ============================================================
+
+nginx:
+  # plus: true  # NGINX Plus 라이센스 보유 시 활성화
+  service:
+    type: LoadBalancer    # MetalLB 가 External IP 할당
+    annotations: {}
+
+nginxGateway:
+  replicaCount: 2         # 가용성 확보 (worker node 수 이하로 설정)
+
+# GatewayClass 이름 (gateway.yaml 의 gatewayClassName 과 일치해야 함)
+gatewayClass:
+  name: nginx

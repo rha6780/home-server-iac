@@ -1,0 +1,31 @@
+---
+- name: Validate Kubernetes shell deploy inputs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Check shell deploy directory
+      ansible.builtin.stat:
+        path: "{{ k8s_shell_dir }}"
+      register: k8s_shell_dir_stat
+
+    - name: Fail when shell deploy directory is missing
+      ansible.builtin.fail:
+        msg: "Kubernetes shell deploy directory not found: {{ k8s_shell_dir }}"
+      when: not k8s_shell_dir_stat.stat.isdir
+
+    - name: Check shell deploy .env
+      ansible.builtin.stat:
+        path: "{{ k8s_env_file }}"
+      register: k8s_env_file_stat
+
+    - name: Fail when .env is missing
+      ansible.builtin.fail:
+        msg: "Create {{ k8s_env_file }} from scripts/kubernetes/.env.example before running this playbook."
+      when: not k8s_env_file_stat.stat.exists
+
+    - name: Check SSH connectivity to Kubernetes nodes
+      ansible.builtin.ping:
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['k8s_haproxy'] + groups['k8s_cp_primary'] + groups['k8s_cp_join'] + groups['k8s_worker'] }}"

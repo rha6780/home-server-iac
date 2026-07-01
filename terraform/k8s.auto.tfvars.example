@@ -1,0 +1,61 @@
+k8s_enabled  = true
+k8s_vm_clone = "vm-temp-01"
+
+k8s_vms = {
+  vm-dev-haproxy-01 = {
+    vmid      = 610
+    memory    = 2048
+    cores     = 2
+    disk_size = "20G"
+    ip        = "192.168.219.29"
+    role      = "haproxy"
+  }
+  vm-dev-k8s-cp-01 = {
+    vmid      = 611
+    memory    = 8192
+    cores     = 4
+    disk_size = "60G"
+    ip        = "192.168.219.30"
+    role      = "control-plane-primary"
+  }
+  vm-dev-k8s-cp-02 = {
+    vmid      = 612
+    memory    = 8192
+    cores     = 4
+    disk_size = "60G"
+    ip        = "192.168.219.31"
+    role      = "control-plane"
+  }
+  vm-dev-k8s-cp-03 = {
+    vmid      = 613
+    memory    = 8192
+    cores     = 4
+    disk_size = "60G"
+    ip        = "192.168.219.32"
+    role      = "control-plane"
+  }
+  vm-dev-k8s-wk-01 = {
+    vmid      = 621
+    memory    = 8192
+    cores     = 4
+    disk_size = "80G"
+    ip        = "192.168.219.41"
+    role      = "worker"
+  }
+  vm-dev-k8s-wk-02 = {
+    vmid      = 622
+    memory    = 8192
+    cores     = 4
+    disk_size = "80G"
+    ip        = "192.168.219.42"
+    role      = "worker"
+  }
+  vm-dev-k8s-wk-03 = {
+    vmid      = 623
+    memory    = 8192
+    cores     = 4
+    disk_size = "80G"
+    ip        = "192.168.219.43"
+    role      = "worker"
+  }
+}
