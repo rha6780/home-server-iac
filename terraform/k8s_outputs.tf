@@ -16,7 +16,7 @@ output "k8s_shell_env_hint" {
       for _, vm in var.k8s_vms : vm.ip
       if vm.role == "haproxy"
     ])
-    cp_01_ip = one([
+    cp_master_ip = one([
       for _, vm in var.k8s_vms : vm.ip
       if vm.role == "control-plane-primary"
     ])

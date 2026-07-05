@@ -7,7 +7,7 @@ variable "k8s_enabled" {
 variable "k8s_vm_clone" {
   type        = string
   description = "Kubernetes VM 생성에 사용할 Proxmox 템플릿 또는 원본 VM 이름"
-  default     = "vm-temp-01"
+  default     = "vm-tamplate-01"
 }
 
 variable "k8s_vms" {
@@ -102,6 +102,7 @@ module "k8s_vms" {
   disk_size   = each.value.disk_size
   macaddr     = each.value.macaddr
   bridge      = each.value.bridge
+  ip          = each.value.ip
   tags        = "kubernetes;${each.value.role}"
-  notes       = "- role : ${each.value.role}\n- install ip : ${each.value.ip}"
+  notes       = "- role : ${each.value.role}\n- ip : ${each.value.ip}"
 }

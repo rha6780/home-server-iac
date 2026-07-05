@@ -6,6 +6,8 @@
 # 사용법:
 #   bash bootstrap.sh                # VM 생성 + k8s 설치 전체
 #   bash bootstrap.sh --skip-terraform  # VM 이미 있을 때 k8s 설치만
+#   bash bootstrap.sh --destroy      # k8s VM 전체 삭제
+#   bash bootstrap.sh --destroy --recreate  # k8s VM 삭제 후 재생성 + 설치
 # ============================================================
 
 set -euo pipefail
@@ -23,13 +25,19 @@ source "${SCRIPT_DIR}/lib.sh"
 # 인수 파싱
 # ============================================================
 SKIP_TERRAFORM=false
+DESTROY=false
+RECREATE=false
 for arg in "$@"; do
   case "${arg}" in
     --skip-terraform) SKIP_TERRAFORM=true ;;
+    --destroy)        DESTROY=true ;;
+    --recreate)       RECREATE=true ;;
     *)
       echo "사용법:"
-      echo "  bash bootstrap.sh                  # VM 생성 + k8s 설치 전체"
-      echo "  bash bootstrap.sh --skip-terraform # VM 이미 있을 때 k8s 설치만"
+      echo "  bash bootstrap.sh                        # VM 생성 + k8s 설치 전체"
+      echo "  bash bootstrap.sh --skip-terraform       # VM 이미 있을 때 k8s 설치만"
+      echo "  bash bootstrap.sh --destroy              # k8s VM 전체 삭제"
+      echo "  bash bootstrap.sh --destroy --recreate   # k8s VM 삭제 후 재생성 + 설치"
       exit 1
       ;;
   esac
@@ -127,17 +135,21 @@ generate_env() {
   local hint
   hint=$(terraform -chdir="${TF_DIR}" output -json k8s_shell_env_hint)
 
-  local haproxy_ip cp_01_ip
+  local haproxy_ip cp_master_ip
   haproxy_ip=$(echo "${hint}" | jq -r '.haproxy_ip')
-  cp_01_ip=$(echo "${hint}"   | jq -r '.cp_01_ip')
+  cp_master_ip=$(echo "${hint}"   | jq -r '.cp_master_ip')
 
-  # CP join IPs (가변 배열)
-  local cp_join_ips_arr
-  mapfile -t cp_join_ips_arr < <(echo "${hint}" | jq -r '.cp_join_ips[] | select(. != "null")')
+  # CP join IPs (가변 배열, bash 3.2 호환)
+  local cp_join_ips_arr=()
+  while IFS= read -r ip; do
+    [[ -n "${ip}" ]] && cp_join_ips_arr+=("${ip}")
+  done < <(echo "${hint}" | jq -r '.cp_join_ips[] | select(. != "null")')
 
-  # Worker IPs (가변 배열)
-  local worker_ips_arr
-  mapfile -t worker_ips_arr < <(echo "${hint}" | jq -r '.worker_ips[]')
+  # Worker IPs (가변 배열, bash 3.2 호환)
+  local worker_ips_arr=()
+  while IFS= read -r ip; do
+    [[ -n "${ip}" ]] && worker_ips_arr+=("${ip}")
+  done < <(echo "${hint}" | jq -r '.worker_ips[]')
 
   if [[ ! -f "${SCRIPT_DIR}/.env.example" ]]; then
     log_error ".env.example 이 없습니다: ${SCRIPT_DIR}/.env.example"
@@ -146,33 +158,30 @@ generate_env() {
 
   cp "${SCRIPT_DIR}/.env.example" "${ENV_FILE}"
 
-  # CP join IPs 블록 동적 생성 (CP_02_IP, CP_03_IP... + CP_JOIN_IPS 배열)
-  local cp_vars_block="CP_01_IP=\"${cp_01_ip}\""
-  local cp_join_refs=""
-  for i in "${!cp_join_ips_arr[@]}"; do
-    local n=$(( i + 2 ))
-    cp_vars_block+=$'\n'"CP_0${n}_IP=\"${cp_join_ips_arr[$i]}\""
-    cp_join_refs+=$'\n'"  \"\${CP_0${n}_IP}\""
+  # CP_JOIN_IPS 배열 문자열
+  local cp_join_block="CP_JOIN_IPS=("
+  for ip in "${cp_join_ips_arr[@]}"; do
+    cp_join_block+=$'\n'"  \"${ip}\""
   done
-  cp_vars_block+=$'\n'"CP_JOIN_IPS=("
-  cp_vars_block+="${cp_join_refs}"
-  cp_vars_block+=$'\n'")"
+  cp_join_block+=$'\n'")"
 
-  # Worker IPs 블록 동적 생성
+  # WORKER_IPS 배열 문자열
   local worker_block="WORKER_IPS=("
   for ip in "${worker_ips_arr[@]}"; do
     worker_block+=$'\n'"  \"${ip}\""
   done
   worker_block+=$'\n'")"
 
-  # Python으로 CP / WORKER 블록 일괄 치환
-  python3 - "${ENV_FILE}" "${haproxy_ip}" "${cp_vars_block}" "${worker_block}" <<'PYEOF'
+  # Python으로 IP 관련 블록 일괄 치환
+  # CP_NNN_IP 변수들 + CP_JOIN_IPS 배열, WORKER_IPS 배열을 통째로 재작성
+  python3 - "${ENV_FILE}" "${haproxy_ip}" "${cp_master_ip}" "${cp_join_block}" "${worker_block}" <<'PYEOF'
 import sys, re
 
-env_path    = sys.argv[1]
-haproxy_ip  = sys.argv[2]
-cp_block    = sys.argv[3]
-worker_block = sys.argv[4]
+env_path      = sys.argv[1]
+haproxy_ip    = sys.argv[2]
+cp_master_ip      = sys.argv[3]
+cp_join_block = sys.argv[4]
+worker_block  = sys.argv[5]
 
 with open(env_path) as f:
     content = f.read()
@@ -180,22 +189,17 @@ with open(env_path) as f:
 # HAPROXY_IP
 content = re.sub(r'^HAPROXY_IP=.*', f'HAPROXY_IP="{haproxy_ip}"', content, flags=re.MULTILINE)
 
-# CP_01_IP ~ CP_JOIN_IPS 블록 전체 치환
-# 패턴: CP_01_IP=... 부터 CP_JOIN_IPS=(...) 까지
-content = re.sub(
-    r'CP_01_IP=.*?CP_JOIN_IPS=\(.*?\)',
-    cp_block,
-    content,
-    flags=re.DOTALL
-)
+# CP_MASTER_IP 한 줄 치환
+content = re.sub(r'^CP_MASTER_IP=.*', f'CP_MASTER_IP="{cp_master_ip}"', content, flags=re.MULTILINE)
+
+# CP_NNN_IP 변수 줄 제거 (CP_02_IP, CP_03_IP 등 — CP_JOIN_IPS로 통합)
+content = re.sub(r'^CP_0[2-9]_IP=.*\n?', '', content, flags=re.MULTILINE)
+
+# CP_JOIN_IPS 블록 치환
+content = re.sub(r'CP_JOIN_IPS=\([^)]*\)', cp_join_block, content, flags=re.DOTALL)
 
 # WORKER_IPS 블록 치환
-content = re.sub(
-    r'WORKER_IPS=\(.*?\)',
-    worker_block,
-    content,
-    flags=re.DOTALL
-)
+content = re.sub(r'WORKER_IPS=\([^)]*\)', worker_block, content, flags=re.DOTALL)
 
 with open(env_path, 'w') as f:
     f.write(content)
@@ -203,7 +207,7 @@ PYEOF
 
   log_success "Step B 완료 — .env 생성: ${ENV_FILE}"
   log_info "  HAProxy    : ${haproxy_ip}"
-  log_info "  CP Primary : ${cp_01_ip}"
+  log_info "  CP Primary : ${cp_master_ip}"
   log_info "  CP Join    : ${cp_join_ips_arr[*]:-없음}"
   log_info "  Workers    : ${worker_ips_arr[*]}"
 }
@@ -215,7 +219,7 @@ wait_for_vms() {
   log_step "Step C. VM SSH 부팅 대기"
   source "${ENV_FILE}"
 
-  local all_ips=("${HAPROXY_IP}" "${CP_01_IP}")
+  local all_ips=("${HAPROXY_IP}" "${CP_MASTER_IP}")
   for ip in "${CP_JOIN_IPS[@]:-}"; do [[ -n "${ip}" ]] && all_ips+=("${ip}"); done
   for ip in "${WORKER_IPS[@]:-}";  do [[ -n "${ip}" ]] && all_ips+=("${ip}"); done
 
@@ -240,12 +244,71 @@ wait_for_vms() {
 }
 
 # ============================================================
-# Step D. k8s 설치 (deploy.sh --all)
+# Step D. VM의 실제 containerd 버전을 .env에 반영
+# ============================================================
+sync_containerd_version() {
+  log_step "Step D. containerd 버전 동기화"
+  source "${ENV_FILE}"
+
+  local installed_ver
+  installed_ver=$(ssh -i "${SSH_KEY}" ${SSH_OPTS} "${SSH_USER}@${CP_MASTER_IP}" \
+    "dpkg-query -W -f='\${Version}' containerd.io 2>/dev/null || echo ''" )
+
+  if [[ -z "${installed_ver}" ]]; then
+    log_warn "  containerd.io 미설치 — .env 버전 유지: ${CONTAINERD_VERSION}"
+    return
+  fi
+
+  if [[ "${installed_ver}" == "${CONTAINERD_VERSION}" ]]; then
+    log_info "  containerd 버전 일치: ${installed_ver}"
+    return
+  fi
+
+  log_info "  VM 설치 버전: ${installed_ver} / .env 버전: ${CONTAINERD_VERSION} → 동기화"
+  _sed_i "s|^CONTAINERD_VERSION=.*|CONTAINERD_VERSION=\"${installed_ver}\"|" "${ENV_FILE}"
+  log_success "Step D 완료 — CONTAINERD_VERSION=${installed_ver}"
+}
+
+# ============================================================
+# Step E. k8s 설치 (deploy.sh --all)
 # ============================================================
 run_deploy() {
-  log_step "Step D. Kubernetes 설치"
+  log_step "Step E. Kubernetes 설치"
   bash "${SCRIPT_DIR}/deploy.sh" --all
-  log_success "Step D 완료 — Kubernetes 설치"
+  log_success "Step E 완료 — Kubernetes 설치"
+}
+
+# ============================================================
+# k8s VM 삭제
+# ============================================================
+destroy_vms() {
+  log_step "k8s VM 삭제"
+
+  if [[ ! -f "${TF_DIR}/k8s.auto.tfvars" ]]; then
+    log_error "tfvars 파일이 없습니다: ${TF_DIR}/k8s.auto.tfvars"
+    exit 1
+  fi
+
+  # k8s_vms 변수에서 VM 이름 목록 추출
+  local vm_names=()
+  while IFS= read -r name; do
+    [[ -n "${name}" ]] && vm_names+=("${name}")
+  done < <(grep -E '^\s+vm-' "${TF_DIR}/k8s.auto.tfvars" | sed 's/[[:space:]={}]//g')
+
+  if [[ ${#vm_names[@]} -eq 0 ]]; then
+    log_error "k8s.auto.tfvars 에서 VM 목록을 찾을 수 없습니다."
+    exit 1
+  fi
+
+  local targets=()
+  for name in "${vm_names[@]}"; do
+    targets+=("-target=module.k8s_vms[\"${name}\"]")
+  done
+
+  log_info "삭제 대상: ${vm_names[*]}"
+  terraform -chdir="${TF_DIR}" destroy "${targets[@]}" -auto-approve >> "${LOG_FILE}" 2>&1
+
+  log_success "k8s VM 삭제 완료"
 }
 
 # ============================================================
@@ -263,10 +326,24 @@ log_info "로그 파일: ${LOG_FILE}"
 
 check_requirements
 
+if [[ "${DESTROY}" == "true" ]]; then
+  destroy_vms
+  if [[ "${RECREATE}" == "false" ]]; then
+    exit 0
+  fi
+  run_terraform
+  generate_env
+  wait_for_vms
+  sync_containerd_version
+  run_deploy
+  exit 0
+fi
+
 if [[ "${SKIP_TERRAFORM}" == "false" ]]; then
   run_terraform
   generate_env
 fi
 
 wait_for_vms
+sync_containerd_version
 run_deploy

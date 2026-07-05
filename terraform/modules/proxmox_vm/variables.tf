@@ -85,3 +85,21 @@ variable "clone" {
   description = "클론할 VM 또는 템플릿 이름 (null이면 빈 VM 생성)"
   default     = null
 }
+
+variable "ip" {
+  type        = string
+  description = "Cloud-Init 고정 IP (CIDR 표기, 예: 192.168.0.10/24). null이면 DHCP"
+  default     = null
+}
+
+variable "gateway" {
+  type        = string
+  description = "Cloud-Init 게이트웨이 IP"
+  default     = "192.168.0.1"
+}
+
+variable "nameserver" {
+  type        = string
+  description = "Cloud-Init DNS 서버"
+  default     = "8.8.8.8"
+}

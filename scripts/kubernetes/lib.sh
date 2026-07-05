@@ -98,14 +98,14 @@ check_ssh() {
 }
 
 # ============================================================
-# join 토큰 수집 (cp-01 에서)
+# join 토큰 수집 (cp-master 에서)
 # 결과를 전역 변수에 저장: JOIN_TOKEN, JOIN_CA_HASH, JOIN_CERT_KEY
 # ============================================================
 fetch_join_info() {
-  log_info "join 토큰 수집 중 (cp-01: ${CP_01_IP})..."
+  log_info "join 토큰 수집 중 (cp-master: ${CP_MASTER_IP})..."
 
   local join_cmd
-  join_cmd=$(_ssh "${CP_01_IP}" \
+  join_cmd=$(_ssh "${CP_MASTER_IP}" \
     "sudo kubeadm token create --print-join-command --ttl 2h 2>/dev/null")
 
   # macOS BSD grep은 -P 미지원 → Python으로 파싱
@@ -121,12 +121,12 @@ print(m.group(1) if m else '')
 ")
 
   local cert_out
-  cert_out=$(_ssh "${CP_01_IP}" \
+  cert_out=$(_ssh "${CP_MASTER_IP}" \
     "sudo kubeadm init phase upload-certs --upload-certs 2>/dev/null")
   JOIN_CERT_KEY=$(echo "${cert_out}" | tail -1)
 
   if [[ -z "${JOIN_TOKEN:-}" || -z "${JOIN_CA_HASH:-}" || -z "${JOIN_CERT_KEY:-}" ]]; then
-    log_error "join 토큰 수집 실패 — cp-01 이 정상 실행 중인지 확인하세요."
+    log_error "join 토큰 수집 실패 — cp-master 이 정상 실행 중인지 확인하세요."
     return 1
   fi
 
@@ -166,13 +166,13 @@ inject_master() {
   local join_ips_str="${CP_JOIN_IPS[*]:-}"
 
   python3 - "${tmp}" "${CONTROL_PLANE_ENDPOINT%%:*}" "${HAPROXY_IP}" \
-      "${CP_01_IP}" "${join_ips_str}" <<'PYEOF'
+      "${CP_MASTER_IP}" "${join_ips_str}" <<'PYEOF'
 import sys, re
 
 path    = sys.argv[1]
 ep      = sys.argv[2]  # endpoint hostname
 lb      = sys.argv[3]  # haproxy ip
-cp01    = sys.argv[4]  # cp-01
+cp01    = sys.argv[4]  # cp-master
 joins   = sys.argv[5].split() if sys.argv[5] else []  # CP_JOIN_IPS
 
 sans = [s for s in [ep, lb, cp01] + joins if s]
@@ -222,8 +222,8 @@ inject_haproxy() {
   tmp=$(mktemp /tmp/setup-haproxy-XXXX.sh)
   cp "${src}" "${tmp}"
 
-  # CP_01 + CP_JOIN_IPS 를 공백구분 문자열로 합산
-  local all_ips="${CP_01_IP}"
+  # CP_MASTER + CP_JOIN_IPS 를 공백구분 문자열로 합산
+  local all_ips="${CP_MASTER_IP}"
   for ip in "${CP_JOIN_IPS[@]:-}"; do
     [[ -n "${ip}" ]] && all_ips+=" ${ip}"
   done

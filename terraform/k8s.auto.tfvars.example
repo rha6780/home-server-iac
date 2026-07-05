@@ -7,7 +7,7 @@ k8s_vms = {
     memory    = 2048
     cores     = 2
     disk_size = "20G"
-    ip        = "192.168.219.29"
+    ip        = "192.168.x.x"
     role      = "haproxy"
   }
   vm-dev-k8s-cp-01 = {
@@ -15,7 +15,7 @@ k8s_vms = {
     memory    = 8192
     cores     = 4
     disk_size = "60G"
-    ip        = "192.168.219.30"
+    ip        = "192.168.x.x"
     role      = "control-plane-primary"
   }
   vm-dev-k8s-cp-02 = {
@@ -23,7 +23,7 @@ k8s_vms = {
     memory    = 8192
     cores     = 4
     disk_size = "60G"
-    ip        = "192.168.219.31"
+    ip        = "192.168.x.x"
     role      = "control-plane"
   }
   vm-dev-k8s-cp-03 = {
@@ -31,7 +31,7 @@ k8s_vms = {
     memory    = 8192
     cores     = 4
     disk_size = "60G"
-    ip        = "192.168.219.32"
+    ip        = "192.168.x.x"
     role      = "control-plane"
   }
   vm-dev-k8s-wk-01 = {
@@ -39,7 +39,7 @@ k8s_vms = {
     memory    = 8192
     cores     = 4
     disk_size = "80G"
-    ip        = "192.168.219.41"
+    ip        = "192.168.x.x"
     role      = "worker"
   }
   vm-dev-k8s-wk-02 = {
@@ -47,7 +47,7 @@ k8s_vms = {
     memory    = 8192
     cores     = 4
     disk_size = "80G"
-    ip        = "192.168.219.42"
+    ip        = "192.168.x.x"
     role      = "worker"
   }
   vm-dev-k8s-wk-03 = {
@@ -55,7 +55,7 @@ k8s_vms = {
     memory    = 8192
     cores     = 4
     disk_size = "80G"
-    ip        = "192.168.219.43"
+    ip        = "192.168.x.x"
     role      = "worker"
   }
 }

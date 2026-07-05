@@ -60,7 +60,7 @@ run_steps() {
 # 요약 출력
 # ============================================================
 print_summary() {
-  local cp_list="${CP_01_IP}"
+  local cp_list="${CP_MASTER_IP}"
   for ip in "${CP_JOIN_IPS[@]:-}"; do
     [[ -n "${ip}" ]] && cp_list+=" / ${ip}"
   done
@@ -93,10 +93,10 @@ print_menu() {
   echo -e "${BOLD}=================================================${RESET}"
   echo ""
   echo -e "  ${CYAN}1${RESET}) step-1-haproxy.sh       HAProxy 설치       (${HAPROXY_IP})"
-  echo -e "  ${CYAN}2${RESET}) step-2-cp-primary.sh    CP Primary 초기화  (${CP_01_IP})"
+  echo -e "  ${CYAN}2${RESET}) step-2-cp-primary.sh    CP Primary 초기화  (${CP_MASTER_IP})"
   echo -e "  ${CYAN}3${RESET}) step-3-cp-join.sh       CP Join            (${cp_join_label})"
   echo -e "  ${CYAN}4${RESET}) step-4-worker-join.sh   Worker Join        (${worker_label})"
-  echo -e "  ${CYAN}5${RESET}) step-5-helm.sh          Helm 컴포넌트 설치  (${CP_01_IP})"
+  echo -e "  ${CYAN}5${RESET}) step-5-helm.sh          Helm 컴포넌트 설치  (${CP_MASTER_IP})"
   echo -e "  ${CYAN}a${RESET}) 전체 실행               1 → 2 → 3 → 4 → 5"
   echo -e "  ${CYAN}q${RESET}) 종료"
   echo ""

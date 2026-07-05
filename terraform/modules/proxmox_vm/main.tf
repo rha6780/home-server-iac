@@ -7,7 +7,7 @@ resource "proxmox_vm_qemu" "vm" {
   full_clone             = var.clone != null ? true : false
   agent                  = 1
   bios                   = "seabios"
-  boot                   = "order=scsi0;ide2;net0"
+  boot                   = "order=scsi0;ide3;net0"
   define_connection_info = false
   force_create           = false
   hotplug                = "network,disk,usb"
@@ -16,8 +16,12 @@ resource "proxmox_vm_qemu" "vm" {
   qemu_os                = "l26"
   scsihw                 = "virtio-scsi-single"
   tablet                 = true
-  tags                   = var.tags
+  tags                   = var.tags != null ? var.tags : ""
   start_at_node_boot     = var.start_at_node_boot
+
+  os_type    = "cloud-init"
+  ipconfig0  = var.ip != null ? "ip=${var.ip}/24,gw=${var.gateway}" : "ip=dhcp"
+  nameserver = var.nameserver
   description            = <<-EOT
     ## ${var.name}
 
@@ -46,6 +50,11 @@ resource "proxmox_vm_qemu" "vm" {
   disks {
     ide {
       ide2 {
+        cloudinit {
+          storage = var.storage
+        }
+      }
+      ide3 {
         cdrom {
           iso = "local:iso/ubuntu-24.04.3-live-server-amd64.iso"
         }
@@ -98,6 +107,6 @@ resource "proxmox_vm_qemu" "vm" {
   }
 
   lifecycle {
-    ignore_changes = [vm_state, tags]
+    ignore_changes = [vm_state, tags, clone, disks, os_type, ipconfig0, nameserver, boot]
   }
 }

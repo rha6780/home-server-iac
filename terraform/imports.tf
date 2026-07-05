@@ -34,11 +34,6 @@ import {
 }
 
 import {
-  to = module.vm-vault-docs-01.proxmox_vm_qemu.vm
-  id = "pve-main/qemu/207"
-}
-
-import {
   to = module.vm-ourjournal-01.proxmox_vm_qemu.vm
   id = "pve-main/qemu/301"
 }
