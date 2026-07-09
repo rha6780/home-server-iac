@@ -218,6 +218,8 @@ PYEOF
 wait_for_vms() {
   log_step "Step C. VM SSH 부팅 대기"
   source "${ENV_FILE}"
+  K8S_MINOR="${K8S_VERSION%.*}"
+  normalize_ssh_opts
 
   local all_ips=("${HAPROXY_IP}" "${CP_MASTER_IP}")
   for ip in "${CP_JOIN_IPS[@]:-}"; do [[ -n "${ip}" ]] && all_ips+=("${ip}"); done
@@ -228,7 +230,7 @@ wait_for_vms() {
   for ip in "${all_ips[@]}"; do
     log_info "  대기 중: ${ip}"
     local elapsed=0
-    until ssh -i "${SSH_KEY}" ${SSH_OPTS} -o ConnectTimeout=5 \
+    until ssh -i "${SSH_KEY_PATH}" ${SSH_OPTS} -o ConnectTimeout=5 \
                "${SSH_USER}@${ip}" "exit" &>/dev/null; do
       if (( elapsed >= max_wait )); then
         log_error "SSH 연결 타임아웃 (${max_wait}s): ${ip}"
@@ -249,9 +251,11 @@ wait_for_vms() {
 sync_containerd_version() {
   log_step "Step D. containerd 버전 동기화"
   source "${ENV_FILE}"
+  K8S_MINOR="${K8S_VERSION%.*}"
+  normalize_ssh_opts
 
   local installed_ver
-  installed_ver=$(ssh -i "${SSH_KEY}" ${SSH_OPTS} "${SSH_USER}@${CP_MASTER_IP}" \
+  installed_ver=$(ssh -i "${SSH_KEY_PATH}" ${SSH_OPTS} "${SSH_USER}@${CP_MASTER_IP}" \
     "dpkg-query -W -f='\${Version}' containerd.io 2>/dev/null || echo ''" )
 
   if [[ -z "${installed_ver}" ]]; then
@@ -274,7 +278,7 @@ sync_containerd_version() {
 # ============================================================
 run_deploy() {
   log_step "Step E. Kubernetes 설치"
-  bash "${SCRIPT_DIR}/deploy.sh" --all
+  SKIP_DEPLOY_LOCK=true bash "${SCRIPT_DIR}/deploy.sh" --all
   log_success "Step E 완료 — Kubernetes 설치"
 }
 
@@ -323,6 +327,7 @@ destroy_vms() {
 } >> "${LOG_FILE}"
 
 log_info "로그 파일: ${LOG_FILE}"
+acquire_deploy_lock
 
 check_requirements
 

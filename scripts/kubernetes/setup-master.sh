@@ -13,7 +13,7 @@ set -euo pipefail
 CONTAINERD_VERSION="1.7.29-1~ubuntu.24.04~noble"
 K8S_VERSION="1.36.2"
 K8S_APT_VERSION="${K8S_VERSION}-2.1"
-K8S_MINOR="1.36"
+K8S_MINOR="${K8S_VERSION%.*}"
 HELM_VERSION="3.21.2"
 
 # ============================
@@ -43,6 +43,93 @@ IS_ORBSTACK="false"
 # ============================
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
+
+admin_kubeconfig_source() {
+  if [[ -f /etc/kubernetes/super-admin.conf ]]; then
+    echo "/etc/kubernetes/super-admin.conf"
+  elif [[ -f /etc/kubernetes/admin.conf ]]; then
+    echo "/etc/kubernetes/admin.conf"
+  else
+    return 1
+  fi
+}
+
+write_user_kubeconfig() {
+  local server="$1"
+  local src
+  src=$(admin_kubeconfig_source)
+
+  mkdir -p "$HOME/.kube"
+  sudo cp -f "$src" "$HOME/.kube/config"
+  sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+  sed -i "s|server: https://.*|server: https://${server}|g" "$HOME/.kube/config"
+
+  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    local sudo_home
+    sudo_home=$(getent passwd "${SUDO_USER}" | cut -d: -f6)
+    if [[ -n "${sudo_home}" && -d "${sudo_home}" ]]; then
+      mkdir -p "${sudo_home}/.kube"
+      cp -f "$HOME/.kube/config" "${sudo_home}/.kube/config"
+      chown -R "${SUDO_USER}:" "${sudo_home}/.kube"
+    fi
+  fi
+}
+
+wait_for_kube_api() {
+  local server="$1" desc="$2" timeout="${3:-300}"
+  local interval=5 elapsed=0
+
+  export KUBECONFIG="$HOME/.kube/config"
+  log "  API 서버 응답 대기: ${desc} (${server}, 최대 ${timeout}s)..."
+
+  until kubectl --request-timeout=5s cluster-info > /dev/null 2>&1; do
+    if (( elapsed >= timeout )); then
+      log "  [ERROR] API 서버 응답 타임아웃: ${desc} (${server})"
+      return 1
+    fi
+    sleep "${interval}"
+    elapsed=$((elapsed + interval))
+  done
+
+  log "  API 서버 응답 확인: ${desc} (${elapsed}s)"
+}
+
+print_control_plane_diagnostics() {
+  log "  진단 정보 수집..."
+  sudo systemctl --no-pager --full status kubelet || true
+  sudo journalctl -u kubelet --no-pager -n 80 || true
+  sudo crictl ps -a 2>/dev/null || true
+}
+
+ensure_primary_ready() {
+  local local_server="${THIS_NODE_IP}:6443"
+
+  if ! admin_kubeconfig_source > /dev/null; then
+    log "  [ERROR] kube-apiserver manifest는 있지만 admin kubeconfig가 없습니다."
+    log "          부분 초기화 상태일 수 있습니다. 재초기화가 필요하면 kubeadm reset 후 다시 실행하세요."
+    print_control_plane_diagnostics
+    return 1
+  fi
+
+  write_user_kubeconfig "${local_server}"
+  if ! wait_for_kube_api "${local_server}" "local control-plane" 60; then
+    log "  local API 미응답 — kubelet/containerd 재시작 후 재확인합니다."
+    sudo systemctl restart containerd || true
+    sudo systemctl restart kubelet || true
+    if ! wait_for_kube_api "${local_server}" "local control-plane after restart" 300; then
+      print_control_plane_diagnostics
+      return 1
+    fi
+  fi
+
+  write_user_kubeconfig "${CONTROL_PLANE_ENDPOINT}"
+  if ! wait_for_kube_api "${CONTROL_PLANE_ENDPOINT}" "load-balanced endpoint" 120; then
+    log "  [ERROR] 로컬 API는 정상이나 CONTROL_PLANE_ENDPOINT가 응답하지 않습니다."
+    log "          HAProxy 설정, DNS/hosts, 방화벽, ${CONTROL_PLANE_ENDPOINT} → ${THIS_NODE_IP}:6443 경로를 확인하세요."
+    print_control_plane_diagnostics
+    return 1
+  fi
+}
 
 log "=== Master 노드 설정 시작 (MODE=${MODE}) ==="
 log "    containerd : ${CONTAINERD_VERSION}"
@@ -251,16 +338,7 @@ if [[ "$MODE" == "primary" ]]; then
   if [[ -f /etc/kubernetes/manifests/kube-apiserver.yaml ]]; then
     log "    [SKIP] 이미 Control Plane 으로 초기화된 노드입니다."
     log "           재초기화가 필요하면: sudo kubeadm reset -f && sudo rm -rf /etc/kubernetes"
-
-    if [[ ! -f "$HOME/.kube/config" ]]; then
-      log "    kubeconfig 설정 중..."
-      mkdir -p "$HOME/.kube"
-      sudo cp /etc/kubernetes/admin.conf "$HOME/.kube/config"
-      sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-      sed -i "s|server: https://.*:6443|server: https://${CONTROL_PLANE_ENDPOINT}|g" \
-        "$HOME/.kube/config"
-      log "    kubeconfig 설정 완료"
-    fi
+    ensure_primary_ready
     exit 0
   fi
 
@@ -302,24 +380,7 @@ EOF
   fi
   rm -f "$CLUSTER_CONFIG"
 
-  # kubeconfig 먼저 설정 (API 서버 체크에 필요)
-  mkdir -p "$HOME/.kube"
-  sudo cp /etc/kubernetes/super-admin.conf "$HOME/.kube/config" 2>/dev/null \
-    || sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
-  sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-  sed -i "s|server: https://.*:6443|server: https://${CONTROL_PLANE_ENDPOINT}|g" \
-    "$HOME/.kube/config"
-  export KUBECONFIG="$HOME/.kube/config"
-
-  # API 서버 응답 대기 (최대 5분)
-  log "  API 서버 응답 대기 (최대 5분)..."
-  for i in $(seq 1 60); do
-    if kubectl cluster-info > /dev/null 2>&1; then
-      log "  API 서버 응답 확인 (${i}번째 시도)"
-      break
-    fi
-    sleep 5
-  done
+  ensure_primary_ready
 
   grep -qxF 'export KUBECONFIG=$HOME/.kube/config' ~/.bash_profile 2>/dev/null \
     || cat >> ~/.bash_profile <<'PROFILE'
@@ -366,9 +427,16 @@ elif [[ "$MODE" == "join" ]]; then
   fi
 
   if [[ -f /etc/kubernetes/kubelet.conf ]]; then
-    log "    [SKIP] 이미 클러스터에 참여된 노드입니다."
-    log "           재참여가 필요하면: sudo kubeadm reset -f && sudo rm -rf /etc/kubernetes"
-    exit 0
+    if [[ -f /etc/kubernetes/manifests/kube-apiserver.yaml ]]; then
+      log "    [SKIP] 이미 Control Plane 으로 참여된 노드입니다."
+      log "           재참여가 필요하면: sudo kubeadm reset -f && sudo rm -rf /etc/kubernetes"
+      exit 0
+    fi
+
+    log "    [ERROR] kubelet.conf는 있지만 kube-apiserver manifest가 없습니다."
+    log "            Control Plane join이 중간 실패한 상태일 수 있습니다."
+    log "            재참여가 필요하면: sudo kubeadm reset -f && sudo rm -rf /etc/kubernetes"
+    exit 1
   fi
 
   if [[ "$IS_ORBSTACK" == "true" ]]; then
@@ -388,11 +456,7 @@ elif [[ "$MODE" == "join" ]]; then
       --apiserver-advertise-address "${THIS_NODE_IP}"
   fi
 
-  mkdir -p "$HOME/.kube"
-  sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
-  sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-  sed -i "s|server: https://.*:6443|server: https://${CONTROL_PLANE_ENDPOINT}|g" \
-    "$HOME/.kube/config"
+  write_user_kubeconfig "${CONTROL_PLANE_ENDPOINT}"
 
   grep -qxF 'export KUBECONFIG=$HOME/.kube/config' ~/.bash_profile 2>/dev/null \
     || cat >> ~/.bash_profile <<'PROFILE'

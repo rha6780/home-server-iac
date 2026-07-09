@@ -29,6 +29,7 @@ RESET='\033[0m'
 
 # LOG_FILE 이 없으면 기본값 설정
 LOG_FILE="${LOG_FILE:-/tmp/k8s-deploy.log}"
+LOCK_DIR="${LOCK_DIR:-/tmp/k8s-deploy.lock}"
 
 log_info()    { local msg="[$(date '+%H:%M:%S')] [INFO]  $*"; echo -e "${BLUE}${msg}${RESET}";   echo "${msg}" >> "$LOG_FILE"; }
 log_success() { local msg="[$(date '+%H:%M:%S')] [OK]    $*"; echo -e "${GREEN}${msg}${RESET}";  echo "${msg}" >> "$LOG_FILE"; }
@@ -51,28 +52,84 @@ load_env() {
   fi
   # shellcheck disable=SC1090
   source "${env_file}"
+  K8S_MINOR="${K8S_VERSION%.*}"
+  normalize_ssh_opts
   log_info ".env 로드: ${env_file}"
 }
 
 # ============================================================
 # SSH / SCP 헬퍼
 # ============================================================
+normalize_ssh_opts() {
+  SSH_USER="${SSH_USER:-ubuntu}"
+  SSH_OPTS="${SSH_OPTS:-}"
+  SSH_KEY_PATH="${SSH_KEY/#\~/$HOME}"
+
+  case " ${SSH_OPTS} " in
+    *" BatchMode="*) ;;
+    *) SSH_OPTS="-o BatchMode=yes ${SSH_OPTS}" ;;
+  esac
+
+  case " ${SSH_OPTS} " in
+    *" ConnectTimeout="*) ;;
+    *) SSH_OPTS="-o ConnectTimeout=10 ${SSH_OPTS}" ;;
+  esac
+
+  case " ${SSH_OPTS} " in
+    *" StrictHostKeyChecking="*) ;;
+    *) SSH_OPTS="-o StrictHostKeyChecking=accept-new ${SSH_OPTS}" ;;
+  esac
+}
+
+mask_secret() {
+  local value="${1:-}"
+  local len="${#value}"
+  if [[ -z "${value}" ]]; then
+    echo ""
+  elif (( len <= 8 )); then
+    echo "********"
+  else
+    echo "${value:0:4}...${value: -4}"
+  fi
+}
+
+acquire_deploy_lock() {
+  if mkdir "${LOCK_DIR}" 2>/dev/null; then
+    echo "$$" > "${LOCK_DIR}/pid"
+    trap 'release_deploy_lock' EXIT INT TERM
+    log_info "실행 lock 획득: ${LOCK_DIR}"
+    return 0
+  fi
+
+  local owner="unknown"
+  [[ -f "${LOCK_DIR}/pid" ]] && owner=$(cat "${LOCK_DIR}/pid" 2>/dev/null || echo "unknown")
+  log_error "다른 Kubernetes 배포가 실행 중입니다. lock=${LOCK_DIR}, pid=${owner}"
+  log_error "실행 중인 프로세스가 없다면 수동으로 lock 디렉터리를 삭제하세요: ${LOCK_DIR}"
+  return 1
+}
+
+release_deploy_lock() {
+  if [[ -d "${LOCK_DIR}" && "$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)" == "$$" ]]; then
+    rm -rf "${LOCK_DIR}"
+  fi
+}
+
 _ssh() {
   local host="$1"; shift
-  ssh -i "${SSH_KEY}" ${SSH_OPTS} "${SSH_USER}@${host}" "$@"
+  ssh -i "${SSH_KEY_PATH}" ${SSH_OPTS} "${SSH_USER}@${host}" "$@"
 }
 
 scp_file() {
   local src="$1" host="$2" dest="$3"
   log_info "  SCP: $(basename "${src}") → ${SSH_USER}@${host}:${dest}"
-  scp -i "${SSH_KEY}" ${SSH_OPTS} "${src}" "${SSH_USER}@${host}:${dest}" \
+  scp -i "${SSH_KEY_PATH}" ${SSH_OPTS} "${src}" "${SSH_USER}@${host}:${dest}" \
     >> "$LOG_FILE" 2>&1
 }
 
 scp_dir() {
   local src="$1" host="$2" dest="$3"
   log_info "  SCP DIR: $(basename "${src}")/ → ${SSH_USER}@${host}:${dest}"
-  scp -i "${SSH_KEY}" ${SSH_OPTS} -r "${src}" "${SSH_USER}@${host}:${dest}" \
+  scp -i "${SSH_KEY_PATH}" ${SSH_OPTS} -r "${src}" "${SSH_USER}@${host}:${dest}" \
     >> "$LOG_FILE" 2>&1
 }
 
@@ -95,6 +152,79 @@ check_ssh() {
     return 1
   fi
   log_success "  SSH OK: ${host}"
+}
+
+preflight_node() {
+  local host="$1" role="$2" min_cpu="$3" min_mem_mb="$4"
+  log_info "  preflight [${role}] ${host}"
+
+  local remote_cmd
+  remote_cmd=$(cat <<EOF
+set -e
+sudo -n true
+cpu=\$(nproc)
+mem_mb=\$(awk '/MemTotal/ {print int(\$2/1024)}' /proc/meminfo)
+hostname=\$(hostname)
+if [ "\$cpu" -lt "${min_cpu}" ]; then
+  echo "[ERROR] CPU 부족: \$cpu core < ${min_cpu} core"
+  exit 10
+fi
+if [ "\$mem_mb" -lt "${min_mem_mb}" ]; then
+  echo "[ERROR] Memory 부족: \${mem_mb}MB < ${min_mem_mb}MB"
+  exit 11
+fi
+if swapon --show | grep -q .; then
+  echo "[WARN] Swap 활성화됨. 설치 단계에서 비활성화합니다."
+fi
+if ! ip route get 1.1.1.1 >/dev/null 2>&1; then
+  echo "[ERROR] 기본 네트워크 라우팅 확인 실패"
+  exit 12
+fi
+if ! sudo modprobe br_netfilter >/dev/null 2>&1; then
+  echo "[WARN] br_netfilter modprobe 실패. 설치 단계에서 다시 시도합니다."
+fi
+echo "[OK] hostname=\${hostname} cpu=\${cpu} mem_mb=\${mem_mb}"
+EOF
+)
+
+  if ! _ssh "${host}" "${remote_cmd}" 2>&1 | tee -a "$LOG_FILE" | sed 's/^/    | /'; then
+    log_error "  preflight 실패 [${role}] ${host}"
+    return 1
+  fi
+}
+
+run_preflight() {
+  log_step "Preflight. Kubernetes 노드 사전 점검"
+
+  local required_vars=(
+    SSH_KEY HAPROXY_IP CP_MASTER_IP CONTROL_PLANE_ENDPOINT
+    CLUSTER_NAME POD_SUBNET SERVICE_SUBNET K8S_VERSION
+  )
+  local var_name
+  for var_name in "${required_vars[@]}"; do
+    if [[ -z "${!var_name:-}" ]]; then
+      log_error "필수 환경변수가 비어 있습니다: ${var_name}"
+      return 1
+    fi
+  done
+
+  if [[ ! -r "${SSH_KEY_PATH}" ]]; then
+    log_error "SSH key 파일을 읽을 수 없습니다: ${SSH_KEY}"
+    return 1
+  fi
+
+  preflight_node "${HAPROXY_IP}" "haproxy" 1 512
+  preflight_node "${CP_MASTER_IP}" "control-plane-primary" 2 1700
+
+  local ip
+  for ip in "${CP_JOIN_IPS[@]:-}"; do
+    [[ -n "${ip}" ]] && preflight_node "${ip}" "control-plane-join" 2 1700
+  done
+  for ip in "${WORKER_IPS[@]:-}"; do
+    [[ -n "${ip}" ]] && preflight_node "${ip}" "worker" 1 1024
+  done
+
+  log_success "Preflight 완료"
 }
 
 # ============================================================
@@ -131,9 +261,9 @@ print(m.group(1) if m else '')
   fi
 
   log_success "토큰 수집 완료"
-  log_info "  TOKEN    : ${JOIN_TOKEN}"
-  log_info "  CA_HASH  : ${JOIN_CA_HASH}"
-  log_info "  CERT_KEY : ${JOIN_CERT_KEY}"
+  log_info "  TOKEN    : $(mask_secret "${JOIN_TOKEN}")"
+  log_info "  CA_HASH  : $(mask_secret "${JOIN_CA_HASH}")"
+  log_info "  CERT_KEY : $(mask_secret "${JOIN_CERT_KEY}")"
 }
 
 # ============================================================
@@ -156,7 +286,7 @@ inject_master() {
     -e "s|^SERVICE_SUBNET=.*|SERVICE_SUBNET=\"${SERVICE_SUBNET}\"|" \
     -e "s|^CONTAINERD_VERSION=.*|CONTAINERD_VERSION=\"${CONTAINERD_VERSION}\"|" \
     -e "s|^K8S_VERSION=.*|K8S_VERSION=\"${K8S_VERSION}\"|" \
-    -e "s|^K8S_MINOR=.*|K8S_MINOR=\"${K8S_MINOR}\"|" \
+    -e "s|^K8S_MINOR=.*|K8S_MINOR=\"${K8S_VERSION%.*}\"|" \
     -e "s|^HELM_VERSION=.*|HELM_VERSION=\"${HELM_VERSION}\"|" \
     -e "s|^IS_ORBSTACK=.*|IS_ORBSTACK=\"${IS_ORBSTACK:-false}\"|" \
     "${tmp}"
@@ -209,7 +339,7 @@ inject_worker() {
     -e "s|^JOIN_CA_CERT_HASH=.*|JOIN_CA_CERT_HASH=\"${ca_hash}\"|" \
     -e "s|^CONTAINERD_VERSION=.*|CONTAINERD_VERSION=\"${CONTAINERD_VERSION}\"|" \
     -e "s|^K8S_VERSION=.*|K8S_VERSION=\"${K8S_VERSION}\"|" \
-    -e "s|^K8S_MINOR=.*|K8S_MINOR=\"${K8S_MINOR}\"|" \
+    -e "s|^K8S_MINOR=.*|K8S_MINOR=\"${K8S_VERSION%.*}\"|" \
     -e "s|^IS_ORBSTACK=.*|IS_ORBSTACK=\"${IS_ORBSTACK:-false}\"|" \
     "${tmp}"
   echo "${tmp}"

@@ -8,6 +8,7 @@
 |---|---|
 | `bootstrap.sh` | **VM 생성 + k8s 설치 전체를 한 번에** (진입점) |
 | `deploy.sh` | 로컬에서 실행하는 통합 오케스트레이터 |
+| `check-versions.sh` | 설정/원격 설치/최신 후보 버전 조회 |
 | `step-1-haproxy.sh` | HAProxy LB 설치 |
 | `step-2-cp-primary.sh` | 첫 번째 Control Plane 초기화 |
 | `step-3-cp-join.sh` | 추가 Control Plane join |
@@ -54,3 +55,44 @@ bash deploy.sh --all
 ```
 
 `.env`와 `deploy_*.log`는 로컬 실행 산출물이므로 git에서 제외합니다.
+
+## 재실행 안정성
+
+`deploy.sh`와 `bootstrap.sh`는 동시에 두 번 실행되지 않도록 `/tmp/k8s-deploy.lock`을 사용합니다. 이전 실행이 비정상 종료되어 lock만 남았다면 실행 중인 프로세스가 없는지 확인한 뒤 lock 디렉터리를 삭제하세요.
+
+배포 전에는 기본 preflight가 실행됩니다.
+
+| 항목 | 내용 |
+|---|---|
+| SSH | 키 파일, 접속 가능 여부, passwordless sudo |
+| 노드 리소스 | Control Plane 최소 2 CPU / 1700 MB, Worker 최소 1 CPU / 1024 MB |
+| OS 준비 | swap 상태, 기본 라우팅, `br_netfilter` 로드 가능 여부 |
+
+필요할 때만 preflight를 건너뜁니다.
+
+```bash
+SKIP_PREFLIGHT=true bash deploy.sh --step 5
+```
+
+`K8S_MINOR`는 `K8S_VERSION`에서 자동 계산되므로 `.env`에 따로 지정하지 않습니다.
+
+## 버전 조회
+
+기본 실행은 `.env.example`의 설정 버전만 읽습니다.
+
+```bash
+bash scripts/kubernetes/check-versions.sh
+```
+
+실제 노드에 설치된 버전까지 확인하려면 `.env`를 명시하고 `--remote`를 사용합니다.
+
+```bash
+bash scripts/kubernetes/check-versions.sh --env scripts/kubernetes/.env --remote
+```
+
+인터넷과 Helm repo 접근이 가능한 환경에서는 최신 후보도 같이 조회할 수 있습니다.
+
+```bash
+bash scripts/kubernetes/check-versions.sh --latest
+bash scripts/kubernetes/check-versions.sh --env scripts/kubernetes/.env --remote --latest
+```

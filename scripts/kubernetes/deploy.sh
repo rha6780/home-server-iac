@@ -32,6 +32,15 @@ load_env
 } >> "$LOG_FILE"
 
 log_info "로그 파일: ${LOG_FILE}"
+if [[ "${SKIP_DEPLOY_LOCK:-false}" != "true" ]]; then
+  acquire_deploy_lock
+fi
+
+if [[ "${SKIP_PREFLIGHT:-false}" != "true" ]]; then
+  run_preflight
+else
+  log_warn "SKIP_PREFLIGHT=true — 노드 사전 점검을 건너뜁니다."
+fi
 
 # ============================================================
 # Step 실행 (각 step-*.sh 파일 호출)

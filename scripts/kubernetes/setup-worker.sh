@@ -12,7 +12,7 @@ set -euo pipefail
 CONTAINERD_VERSION="1.7.29-1~ubuntu.24.04~noble"
 K8S_VERSION="1.36.2"
 K8S_APT_VERSION="${K8S_VERSION}-2.1"
-K8S_MINOR="1.36"
+K8S_MINOR="${K8S_VERSION%.*}"
 
 # ============================
 # [수정 필요] 환경 설정
