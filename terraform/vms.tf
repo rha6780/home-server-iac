@@ -8,6 +8,21 @@ module "vm-vault-docs-01" {
   clone       = "vm-tamplate-01"
 }
 
+module "vm-netbox-01" {
+  source = "./modules/proxmox_vm"
+
+  name        = "vm-netbox-01"
+  vmid        = 208
+  target_node = local.default_node
+  storage     = local.default_storage
+  clone       = "vm-tamplate-01"
+  memory      = 4096
+  cores       = 2
+  disk_size   = "40G"
+  tags        = "netbox;ipam;dcim"
+  notes       = "- role : NetBox Community\n- deploy : Docker Compose"
+}
+
 module "vm-iac-01" {
   source = "./modules/proxmox_vm"
 

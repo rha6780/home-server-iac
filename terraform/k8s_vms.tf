@@ -84,25 +84,12 @@ variable "k8s_vms" {
   }
 }
 
-locals {
-  k8s_enabled_vms = var.k8s_enabled ? var.k8s_vms : {}
-}
+module "kubernetes" {
+  source = "./modules/kubernetes"
 
-module "k8s_vms" {
-  for_each = local.k8s_enabled_vms
-  source   = "./modules/proxmox_vm"
-
-  name        = each.key
-  vmid        = each.value.vmid
-  target_node = coalesce(each.value.target_node, local.default_node)
-  storage     = coalesce(each.value.storage, local.default_storage)
-  clone       = var.k8s_vm_clone
-  memory      = each.value.memory
-  cores       = each.value.cores
-  disk_size   = each.value.disk_size
-  macaddr     = each.value.macaddr
-  bridge      = each.value.bridge
-  ip          = each.value.ip
-  tags        = "kubernetes;${each.value.role}"
-  notes       = "- role : ${each.value.role}\n- ip : ${each.value.ip}"
+  enabled             = var.k8s_enabled
+  vm_clone            = var.k8s_vm_clone
+  vms                 = var.k8s_vms
+  default_target_node = local.default_node
+  default_storage     = local.default_storage
 }

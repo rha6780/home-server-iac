@@ -93,6 +93,7 @@ terraform destroy
 | vm-vpn-01 | 205 | 2 core | 2 GB | 20 GB | VPN 서버 | 자동 |
 | vm-jenkins-01 | 206 | 2 core | 2 GB | 20 GB | Jenkins CI/CD | 자동 |
 | vm-vault-docs-01 | 207 | 2 core | 2 GB | 20 GB | 문서/Vault 서버 | 자동 |
+| vm-netbox-01 | 208 | 2 core | 4 GB | 40 GB | NetBox Community (IPAM/DCIM) | 자동 |
 | vm-ourjournal-01 | 301 | 2 core | 2 GB | 20 GB | 개인 저널 서비스 | 자동 |
 | vm-file-share-01 | 504 | 2 core | 2 GB | 32 GB | 파일 공유 서버 | 자동 |
 | vm-mine-lfin-01 | 505 | 4 core | 32 GB | 20 GB | 마인크래프트 Lifin 서버 | 자동 |

@@ -49,4 +49,3 @@ terraform.rc
 ## Local Kubernetes deploy environment
 scripts/kubernetes/.env
 scripts/kubernetes/deploy_*.log
-

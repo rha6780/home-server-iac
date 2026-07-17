@@ -19,10 +19,10 @@ resource "proxmox_vm_qemu" "vm" {
   tags                   = var.tags != null ? var.tags : ""
   start_at_node_boot     = var.start_at_node_boot
 
-  os_type    = "cloud-init"
-  ipconfig0  = var.ip != null ? "ip=${var.ip}/24,gw=${var.gateway}" : "ip=dhcp"
-  nameserver = var.nameserver
-  description            = <<-EOT
+  os_type     = "cloud-init"
+  ipconfig0   = var.ip != null ? "ip=${var.ip}/24,gw=${var.gateway}" : "ip=dhcp"
+  nameserver  = var.nameserver
+  description = <<-EOT
     ## ${var.name}
 
     - cpu : ${var.cores}core
@@ -107,6 +107,6 @@ resource "proxmox_vm_qemu" "vm" {
   }
 
   lifecycle {
-    ignore_changes = [vm_state, tags, clone, disks, os_type, ipconfig0, nameserver, boot]
+    ignore_changes = [vm_state, tags, clone, full_clone, disks, os_type, ipconfig0, nameserver, boot]
   }
 }
