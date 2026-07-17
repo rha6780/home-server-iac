@@ -49,3 +49,6 @@ terraform.rc
 ## Local Kubernetes deploy environment
 scripts/kubernetes/.env
 scripts/kubernetes/deploy_*.log
+
+## Local NetBox inventory mapping
+terraform/netbox.tf

@@ -1,0 +1,123 @@
+# Copy this file to netbox.tf and adjust the inventory values for your site.
+# netbox.tf is intentionally ignored by git because it can expose local VM names,
+# VMIDs, MAC addresses, and private IP assignments.
+
+locals {
+  netbox_regular_vms = {
+    example-vm-01 = {
+      vmid      = 100
+      memory    = 2048
+      cores     = 2
+      disk_size = "20G"
+      role      = "example"
+      macaddr   = null
+    }
+  }
+
+  netbox_k8s_vms = var.k8s_enabled ? {
+    for name, vm in var.k8s_vms : name => {
+      vmid      = vm.vmid
+      memory    = vm.memory
+      cores     = vm.cores
+      disk_size = vm.disk_size
+      role      = "k8s-${vm.role}"
+      macaddr   = try(vm.macaddr, null)
+      ip        = "${vm.ip}/${var.netbox_k8s_ip_prefix_length}"
+    }
+  } : {}
+
+  netbox_vms = merge(
+    local.netbox_regular_vms,
+    local.netbox_k8s_vms,
+  )
+
+  netbox_vm_ips = merge(
+    var.netbox_regular_vm_ips,
+    {
+      for name, vm in local.netbox_k8s_vms : name => vm.ip
+    },
+  )
+
+  netbox_vm_macs = {
+    for name, vm in local.netbox_vms : name => vm.macaddr
+    if vm.macaddr != null
+  }
+}
+
+resource "netbox_site" "home_lab" {
+  count = var.netbox_enabled ? 1 : 0
+
+  name        = var.netbox_site_name
+  slug        = var.netbox_site_slug
+  status      = "active"
+  description = "Home server site managed by Terraform."
+}
+
+resource "netbox_cluster_type" "proxmox" {
+  count = var.netbox_enabled ? 1 : 0
+
+  name = "Proxmox VE"
+  slug = "proxmox-ve"
+}
+
+resource "netbox_cluster" "proxmox_home" {
+  count = var.netbox_enabled ? 1 : 0
+
+  name            = var.netbox_cluster_name
+  cluster_type_id = netbox_cluster_type.proxmox[0].id
+  site_id         = netbox_site.home_lab[0].id
+  description     = "Proxmox cluster managed by Terraform."
+}
+
+resource "netbox_virtual_machine" "vm" {
+  for_each = var.netbox_enabled ? local.netbox_vms : {}
+
+  name         = each.key
+  cluster_id   = netbox_cluster.proxmox_home[0].id
+  status       = "active"
+  memory_mb    = each.value.memory
+  vcpus        = each.value.cores
+  disk_size_mb = tonumber(trimsuffix(each.value.disk_size, "G")) * 1024
+  description  = "Proxmox VMID ${each.value.vmid}; role ${each.value.role}; managed by Terraform."
+}
+
+resource "netbox_interface" "vm_eth0" {
+  for_each = var.netbox_enabled ? local.netbox_vms : {}
+
+  name               = "eth0"
+  virtual_machine_id = netbox_virtual_machine.vm[each.key].id
+  enabled            = true
+  description        = "Primary Proxmox VM interface."
+}
+
+resource "netbox_mac_address" "vm_eth0" {
+  for_each = var.netbox_enabled ? local.netbox_vm_macs : {}
+
+  mac_address                  = each.value
+  virtual_machine_interface_id = netbox_interface.vm_eth0[each.key].id
+}
+
+resource "netbox_virtual_machine_interface_primary_mac_address" "vm_eth0" {
+  for_each = var.netbox_enabled ? local.netbox_vm_macs : {}
+
+  interface_id   = netbox_interface.vm_eth0[each.key].id
+  mac_address_id = netbox_mac_address.vm_eth0[each.key].id
+}
+
+resource "netbox_ip_address" "vm_eth0" {
+  for_each = var.netbox_enabled ? local.netbox_vm_ips : {}
+
+  ip_address                   = each.value
+  status                       = "active"
+  virtual_machine_interface_id = netbox_interface.vm_eth0[each.key].id
+  dns_name                     = each.key
+  description                  = "Primary IP for ${each.key}; managed by Terraform."
+}
+
+resource "netbox_primary_ip" "vm_eth0" {
+  for_each = var.netbox_enabled ? local.netbox_vm_ips : {}
+
+  virtual_machine_id = netbox_virtual_machine.vm[each.key].id
+  ip_address_id      = netbox_ip_address.vm_eth0[each.key].id
+  ip_address_version = 4
+}

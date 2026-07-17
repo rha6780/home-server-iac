@@ -12,6 +12,7 @@
 홈서버 환경에서 VM 생성, 네트워크 설정, 소프트웨어 구성 등을 코드로 관리하기 위한 저장소입니다.
 
 - **Terraform** 으로 Proxmox 위에 VM 인프라를 프로비저닝합니다.
+- **NetBox** 로 VM, IP, MAC, 클러스터 정보를 인벤토리화할 수 있습니다.
 - **Ansible** 로 VM 내부 소프트웨어 설정 및 반복 작업을 자동화합니다.
 - **Semaphore** 를 통해 Ansible 플레이북을 UI/스케줄러 기반으로 실행합니다.
 
@@ -50,6 +51,7 @@ home-server-iac/
 | Provider | 버전 |
 |---|---|
 | `telmate/proxmox` | `3.0.2-rc06` |
+| `e-breuninger/netbox` | `~> 5.6` |
 
 ### 변수 설정
 
@@ -62,6 +64,18 @@ provider_pm_password = "<PASSWORD>"
 ```
 
 > 인증 정보가 포함된 `terraform.tfvars` 는 `.gitignore` 에 추가하는 것을 권장합니다.
+
+NetBox 인벤토리 연동은 기본 비활성화 상태입니다. 사용할 때만 API 정보를 환경변수로 주입하고 `netbox_enabled=true`를 켭니다.
+
+```bash
+cp terraform/netbox.tf.example terraform/netbox.tf
+export NETBOX_SERVER_URL="https://<NETBOX_HOST>"
+export NETBOX_API_TOKEN="nbt_xxx..."
+
+terraform plan -var='netbox_enabled=true'
+```
+
+`terraform/netbox.tf`는 로컬 인벤토리 파일이라 git에서 제외됩니다. 일반 VM의 IP는 `netbox_regular_vm_ips`에 CIDR 형식으로 넣습니다. Kubernetes VM은 `k8s_vms`의 IP를 사용합니다.
 
 ### 주요 명령어
 
@@ -142,6 +156,7 @@ ansible-galaxy collection install -r semaphore/playbooks/proxmox/requirements.ym
 ```text
 로컬 PC
   ├─ Terraform → Proxmox API → VM 생성
+  ├─ Terraform → NetBox API → VM/IP/MAC 인벤토리 등록
   └─ Kubernetes 배포 스크립트 → SSH → 노드 설정
 
 운영 자동화
