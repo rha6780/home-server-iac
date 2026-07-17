@@ -43,9 +43,25 @@ helm repo add metallb       https://metallb.github.io/metallb
 helm repo update
 
 # -----------
-# 1. Calico CNI
+# 1. Calico CRD
 # -----------
-log "[1/4] Calico CNI ${CALICO_CHART_VERSION} 설치..."
+log "[1/5] Calico CRD ${CALICO_CHART_VERSION} 설치..."
+helm template calico-crds projectcalico/crd.projectcalico.org.v1 \
+  --version "${CALICO_CHART_VERSION}" \
+  | kubectl apply --server-side -f -
+
+log "  Calico operator CRD 등록 완료 대기..."
+kubectl wait --for=condition=established \
+  crd/installations.operator.tigera.io \
+  crd/apiservers.operator.tigera.io \
+  crd/goldmanes.operator.tigera.io \
+  crd/whiskers.operator.tigera.io \
+  --timeout=90s
+
+# -----------
+# 2. Calico CNI
+# -----------
+log "[2/5] Calico CNI ${CALICO_CHART_VERSION} 설치..."
 helm upgrade --install calico projectcalico/tigera-operator \
   --namespace tigera-operator \
   --create-namespace \
@@ -58,9 +74,9 @@ kubectl get pods -n calico-system -l app.kubernetes.io/name=calico-node 2>/dev/n
   || kubectl get pods -n kube-system -l k8s-app=calico-node
 
 # -----------
-# 2. MetalLB
+# 3. MetalLB
 # -----------
-log "[2/4] MetalLB ${METALLB_CHART_VERSION} 설치..."
+log "[3/5] MetalLB ${METALLB_CHART_VERSION} 설치..."
 helm upgrade --install metallb metallb/metallb \
   --namespace metallb-system \
   --create-namespace \
@@ -77,9 +93,9 @@ kubectl wait --namespace metallb-system \
 kubectl apply -f "${CHARTS_DIR}/metallb/ip-address-pool.yaml"
 
 # -----------
-# 3. Gateway API CRD (NGINX Gateway Fabric 요구사항)
+# 4. Gateway API CRD (NGINX Gateway Fabric 요구사항)
 # -----------
-log "[3/4] Gateway API CRD v${GATEWAY_API_VERSION} 설치..."
+log "[4/5] Gateway API CRD v${GATEWAY_API_VERSION} 설치..."
 kubectl apply -f \
   "https://github.com/kubernetes-sigs/gateway-api/releases/download/v${GATEWAY_API_VERSION}/standard-install.yaml"
 
@@ -90,11 +106,11 @@ kubectl wait --for=condition=established \
   --timeout=60s
 
 # -----------
-# 4. NGINX Gateway Fabric
+# 5. NGINX Gateway Fabric
 # -----------
-log "[4/4] NGINX Gateway Fabric ${NGF_CHART_VERSION} 설치..."
+log "[5/5] NGINX Gateway Fabric ${NGF_CHART_VERSION} 설치..."
 helm upgrade --install nginx-gateway-fabric \
-  oci://ghcr.io/nginxinc/charts/nginx-gateway-fabric \
+  oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
   --namespace nginx-gateway \
   --create-namespace \
   --version "${NGF_CHART_VERSION}" \

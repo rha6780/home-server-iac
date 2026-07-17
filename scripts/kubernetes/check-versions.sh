@@ -206,7 +206,7 @@ latest_versions() {
   calico_latest=$(latest_helm_chart "projectcalico" "https://docs.tigera.io/calico/charts" "tigera-operator" 2>/dev/null || true)
   metallb_latest=$(latest_helm_chart "metallb" "https://metallb.github.io/metallb" "metallb" 2>/dev/null || true)
   gateway_latest=$(strip_v "$(latest_github_release "kubernetes-sigs/gateway-api" 2>/dev/null || latest_github_tag "kubernetes-sigs/gateway-api" 2>/dev/null || true)")
-  ngf_latest=$(latest_oci_chart "oci://ghcr.io/nginxinc/charts/nginx-gateway-fabric" 2>/dev/null || true)
+  ngf_latest=$(latest_oci_chart "oci://ghcr.io/nginx/charts/nginx-gateway-fabric" 2>/dev/null || true)
 
   print_row "Kubernetes stable" "${K8S_VERSION:-unset}" "-" "${k8s_latest:-unknown}"
   print_row "Kubernetes ${K8S_MINOR}" "${K8S_VERSION:-unset}" "-" "${k8s_minor_latest:-unknown}"
