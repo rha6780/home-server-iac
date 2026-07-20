@@ -10,6 +10,7 @@ set -euo pipefail
 # 버전 설정
 # ============================
 CONTAINERD_VERSION="1.7.29-1~ubuntu.24.04~noble"
+ALLOW_CONTAINERD_DOWNGRADE="false"
 K8S_VERSION="1.36.2"
 K8S_APT_VERSION="${K8S_VERSION}-2.1"
 K8S_MINOR="${K8S_VERSION%.*}"
@@ -98,6 +99,11 @@ log "[4/5] containerd ${CONTAINERD_VERSION} 설치..."
 INSTALLED_CTR=$(dpkg-query -W -f='${Version}' containerd.io 2>/dev/null || echo "")
 if [[ "${INSTALLED_CTR}" == "${CONTAINERD_VERSION}" ]]; then
   log "    [SKIP] containerd 이미 설치됨: ${INSTALLED_CTR}"
+elif [[ -n "${INSTALLED_CTR}" && "${ALLOW_CONTAINERD_DOWNGRADE}" != "true" ]]; then
+  log "    [SKIP] containerd 다른 버전이 이미 설치됨: ${INSTALLED_CTR}"
+  log "           목표 버전: ${CONTAINERD_VERSION}"
+  log "           downgrade/변경이 필요하면 ALLOW_CONTAINERD_DOWNGRADE=true 로 실행하세요."
+  sudo apt-mark hold containerd.io 2>/dev/null || true
 else
   sudo apt-get update -qq
   sudo apt-get install -y ca-certificates curl gnupg
@@ -115,7 +121,11 @@ else
 
   sudo apt-mark unhold containerd.io 2>/dev/null || true
   sudo apt-get update -qq
-  sudo apt-get install -y "containerd.io=${CONTAINERD_VERSION}"
+  if [[ -n "${INSTALLED_CTR}" && "${ALLOW_CONTAINERD_DOWNGRADE}" == "true" ]]; then
+    sudo apt-get install -y --allow-downgrades "containerd.io=${CONTAINERD_VERSION}"
+  else
+    sudo apt-get install -y "containerd.io=${CONTAINERD_VERSION}"
+  fi
   sudo apt-mark hold containerd.io
 fi
 

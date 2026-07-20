@@ -32,6 +32,7 @@
 | `bootstrap.sh` | VM 생성부터 Kubernetes 설치까지 전체 진입점 |
 | `deploy.sh` | Step 1~5 통합 오케스트레이터 |
 | `check-versions.sh` | 설정·원격 설치·최신 후보 버전 조회 |
+| `fetch-kubeconfig.sh` | Control Plane kubeconfig를 로컬 별도 파일로 복사 |
 | `lib.sh` | SSH, preflight, lock, 설정 주입 공통 함수 |
 | `step-1-haproxy.sh` | HAProxy 설치 |
 | `step-2-cp-primary.sh` | Primary Control Plane 초기화 |
@@ -185,13 +186,7 @@ bash scripts/kubernetes/check-versions.sh \
 Control Plane의 kubeconfig를 로컬로 복사하면 요청은 `CONTROL_PLANE_ENDPOINT` → HAProxy → Control Plane으로 전달됩니다. 기존 kubeconfig를 덮어쓰지 않도록 별도 파일을 사용하세요.
 
 ```bash
-mkdir -p ~/.kube
-
-scp -i ~/.ssh/rha6780.pem \
-  ubuntu@192.168.0.51:~/.kube/config \
-  ~/.kube/home-server.yaml
-
-chmod 600 ~/.kube/home-server.yaml
+bash scripts/kubernetes/fetch-kubeconfig.sh --env scripts/kubernetes/.env
 
 KUBECONFIG=~/.kube/home-server.yaml kubectl get nodes -o wide
 KUBECONFIG=~/.kube/home-server.yaml kubectl get pods -A

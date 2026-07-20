@@ -285,6 +285,7 @@ inject_master() {
     -e "s|^POD_SUBNET=.*|POD_SUBNET=\"${POD_SUBNET}\"|" \
     -e "s|^SERVICE_SUBNET=.*|SERVICE_SUBNET=\"${SERVICE_SUBNET}\"|" \
     -e "s|^CONTAINERD_VERSION=.*|CONTAINERD_VERSION=\"${CONTAINERD_VERSION}\"|" \
+    -e "s|^ALLOW_CONTAINERD_DOWNGRADE=.*|ALLOW_CONTAINERD_DOWNGRADE=\"${ALLOW_CONTAINERD_DOWNGRADE:-false}\"|" \
     -e "s|^K8S_VERSION=.*|K8S_VERSION=\"${K8S_VERSION}\"|" \
     -e "s|^K8S_MINOR=.*|K8S_MINOR=\"${K8S_VERSION%.*}\"|" \
     -e "s|^HELM_VERSION=.*|HELM_VERSION=\"${HELM_VERSION}\"|" \
@@ -338,6 +339,7 @@ inject_worker() {
     -e "s|^JOIN_TOKEN=.*|JOIN_TOKEN=\"${token}\"|" \
     -e "s|^JOIN_CA_CERT_HASH=.*|JOIN_CA_CERT_HASH=\"${ca_hash}\"|" \
     -e "s|^CONTAINERD_VERSION=.*|CONTAINERD_VERSION=\"${CONTAINERD_VERSION}\"|" \
+    -e "s|^ALLOW_CONTAINERD_DOWNGRADE=.*|ALLOW_CONTAINERD_DOWNGRADE=\"${ALLOW_CONTAINERD_DOWNGRADE:-false}\"|" \
     -e "s|^K8S_VERSION=.*|K8S_VERSION=\"${K8S_VERSION}\"|" \
     -e "s|^K8S_MINOR=.*|K8S_MINOR=\"${K8S_VERSION%.*}\"|" \
     -e "s|^IS_ORBSTACK=.*|IS_ORBSTACK=\"${IS_ORBSTACK:-false}\"|" \
@@ -365,6 +367,7 @@ inject_haproxy() {
     -e "s|^STATS_PORT=.*|STATS_PORT=${STATS_PORT}|" \
     -e "s|^STATS_USER=.*|STATS_USER=\"${STATS_USER}\"|" \
     -e "s|^STATS_PASS=.*|STATS_PASS=\"${STATS_PASS}\"|" \
+    -e "s|^RELEASE_CONFLICTING_PORTS=.*|RELEASE_CONFLICTING_PORTS=\"${RELEASE_CONFLICTING_PORTS:-true}\"|" \
     -e "s|^HAPROXY_VERSION=.*|HAPROXY_VERSION=\"${HAPROXY_VERSION}\"|" \
     "${tmp}"
   echo "${tmp}"
